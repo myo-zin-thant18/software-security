@@ -1,0 +1,60 @@
+# Week 2 Task 6 — security CI gate, adapted from labs/week15-devsecops-pipeline/security-ci.yml
+# Runs Semgrep (SAST) + Trivy (SCA) + Gitleaks (secrets) and FAILS on HIGH/CRITICAL.
+name: security-ci
+
+on:
+  push:
+    branches: [main, wk02]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gate — fail on Semgrep findings
+        run: |
+          semgrep scan \
+            --config p/default \
+            --config p/owasp-top-ten \
+            --error \
+            labs/week02-sdlc-tooling/vulnerable-repo \
+            project/starter-app
+
+  trivy:
+    name: SCA (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gate — fail on HIGH/CRITICAL dependencies
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: project/starter-app
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: "1"
+
+  gitleaks:
+    name: Secrets (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gate — fail if any secret is found
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            detect --no-git -s /repo/labs/week02-sdlc-tooling/vulnerable-repo \
+            --exit-code 1 -v
