@@ -20,14 +20,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Semgrep scan (report)
+        run: |
+          semgrep scan --metrics=off \
+            --config p/default --config p/owasp-top-ten \
+            labs/week02-sdlc-tooling/vulnerable-repo project/starter-app
+
       - name: Gate — fail on Semgrep findings
         run: |
-          semgrep scan \
-            --config p/default \
-            --config p/owasp-top-ten \
-            --error \
-            labs/week02-sdlc-tooling/vulnerable-repo \
-            project/starter-app
+          semgrep scan --metrics=off --error \
+            --config p/default --config p/owasp-top-ten \
+            labs/week02-sdlc-tooling/vulnerable-repo project/starter-app
 
   trivy:
     name: SCA (Trivy)
@@ -36,7 +39,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Gate — fail on HIGH/CRITICAL dependencies
-        uses: aquasecurity/trivy-action@0.24.0
+        # Pinned to the same commit SHA the repo's own security-ci.yml uses (v0.36.0);
+        # the Week 15 template's @0.24.0 tag no longer resolves.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           scan-type: fs
           scan-ref: project/starter-app
